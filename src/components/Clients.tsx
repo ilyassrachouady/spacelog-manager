@@ -1,49 +1,53 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { FileText, Plus, Search, Check, ChevronRight, Download, MapPin, Upload } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { clientData, type SiteKey } from '../data';
 
-// Mock data for available cells
-const availableCells = [
-  { id: 'C02', name: 'Cellule A2', area: 50, price: 750 },
-  { id: 'C05', name: 'Cellule C1', area: 25, price: 400 },
-  { id: 'C08', name: 'Cellule D2', area: 200, price: 2600 },
-];
+const siteNames: Record<Exclude<SiteKey, 'consolidated'>, string> = {
+  montigny: 'Site Montigny',
+  boissy: 'Site Boissy',
+  moussy: 'Site Moussy',
+  trappes: 'Site Trappes',
+};
 
-const initialClients = [
-  { id: 1, name: "TRANSIMPEX INTERNATIONAL SERVICES", site: "Site Boissy-l'Aillerie", cell: "13", rent: "1 400 € HT", status: "Actif", signature: "Signé" },
-  { id: 3, name: "AFAQ", site: "Site Montigny", cell: "10", rent: "2 500 € HT", status: "Actif", signature: "Signé" },
-  { id: 4, name: "ADF PLOMBERIE", site: "Site Montigny", cell: "8", rent: "2 600 € HT", status: "Actif", signature: "Signé" },
-  { id: 5, name: "ABBYNAYA EXOTIQUE", site: "Site Montigny", cell: "13", rent: "2 300 € HT", status: "Actif", signature: "Signé" },
-  { id: 6, name: "JO & LIZ", site: "Site Montigny", cell: "14", rent: "2 400 € HT", status: "Actif", signature: "Signé" },
-  { id: 7, name: "KBE TECHNOLOGY", site: "Site Montigny", cell: "1 & 9", rent: "4 600 € HT", status: "Actif", signature: "Signé" },
-  { id: 9, name: "BEN HADEF ZIED", site: "Site Boissy-l'Aillerie", cell: "1", rent: "1 800 € HT", status: "Actif", signature: "Signé" },
-  { id: 10, name: "MADE IN WORLD", site: "Site Boissy-l'Aillerie", cell: "6", rent: "1 700 € HT", status: "Actif", signature: "Signé" },
-  { id: 11, name: "INTERTRADE LOGISTICS", site: "Site Moussy", cell: "3", rent: "1 800 € HT", status: "Actif", signature: "Signé" },
-  { id: 12, name: "EXCELLENCE RENOV MULTISERVICES", site: "Site Boissy-l'Aillerie", cell: "17", rent: "2 200 € HT", status: "Actif", signature: "Signé" },
-  { id: 13, name: "TEMF TRANSPORT LOGISTICS", site: "Site Boissy-l'Aillerie", cell: "12", rent: "1 400 € HT", status: "Actif", signature: "Signé" },
-  { id: 14, name: "ET VOILA", site: "Site Boissy-l'Aillerie", cell: "11", rent: "1 400 € HT", status: "Actif", signature: "Signé" },
-  { id: 15, name: "MELSCHER SARL", site: "Site Boissy-l'Aillerie", cell: "18", rent: "1 700 € HT", status: "Actif", signature: "Signé" },
-  { id: 16, name: "KOUS PRODUCTION", site: "Site Boissy-l'Aillerie", cell: "2", rent: "1 700 € HT", status: "Actif", signature: "Signé" },
-  { id: 17, name: "KOZEN LOG", site: "Site Boissy-l'Aillerie", cell: "15", rent: "1 650 € HT", status: "Actif", signature: "Signé" },
-  { id: 19, name: "JB GARAGE AUTO-SERVICES", site: "Site Boissy-l'Aillerie", cell: "10", rent: "1 900 € HT", status: "Actif", signature: "Signé" },
-  { id: 20, name: "DIRECT ASSISTANCE", site: "Site Boissy-l'Aillerie", cell: "4 & 5", rent: "3 400 € HT", status: "Actif", signature: "Signé" },
-  { id: 21, name: "AUTOLAVEUSE CENTER", site: "Site Boissy-l'Aillerie", cell: "16", rent: "1 700 € HT", status: "Actif", signature: "Signé" },
-  { id: 22, name: "VERNOVA FRANCE", site: "Site Boissy-l'Aillerie", cell: "3", rent: "1 700 € HT", status: "Actif", signature: "Signé" },
-  { id: 23, name: "PARFUM GLOBAL TRADE", site: "Site Boissy-l'Aillerie", cell: "19", rent: "1 700 € HT", status: "Actif", signature: "Signé" },
-  { id: 24, name: "SOW COUVERTURE", site: "Site Moussy", cell: "4", rent: "2 000 € HT", status: "Actif", signature: "Signé" },
-  { id: 28, name: "KOUASSI ASSIENIN - EMITEL MARKET", site: "Site Montigny", cell: "3", rent: "2 100 € HT", status: "Actif", signature: "Signé" },
-  { id: 29, name: "PLAIDY", site: "Site Boissy-l'Aillerie", cell: "7", rent: "1 700 € HT", status: "Actif", signature: "Signé" },
-  { id: 30, name: "SYL DEVELOPPEMENT", site: "Site Boissy-l'Aillerie", cell: "9", rent: "1 650 € HT", status: "Actif", signature: "Signé" },
-  { id: 31, name: "SEMO SERVICES MODERNES", site: "Site Montigny", cell: "10", rent: "2 100 € HT", status: "Actif", signature: "Signé" },
-  { id: 32, name: "OZ DISTRIBUTION", site: "Site Montigny", cell: "5", rent: "2 340 € HT", status: "Actif", signature: "Signé" },
-  { id: 33, name: "SOLAROCK", site: "Site Montigny", cell: "2", rent: "2 500 € HT", status: "Actif", signature: "Signé" },
-  { id: 34, name: "CLIENT TEST", site: "Nouveau Client", cell: "1", rent: "0 € HT", status: "En attente", signature: "Non signé" }
-];
+function buildInitialClients() {
+  let id = 1;
+  const result: { id: number; name: string; site: string; cell: string; rent: string; status: string; signature: string; surface: number; depot: number; finContrat: string; duree: number }[] = [];
+  for (const [siteKey, clients] of Object.entries(clientData)) {
+    const siteName = siteNames[siteKey as Exclude<SiteKey, 'consolidated'>];
+    for (const c of clients) {
+      result.push({
+        id: id++,
+        name: c.client || '—',
+        site: siteName,
+        cell: c.cell,
+        rent: c.loyer > 0 ? `${c.loyer.toLocaleString('fr-FR')} € HT` : '—',
+        status: c.status === 'actif' ? 'Actif' : c.status === 'en_attente' ? 'En attente' : c.status === 'travaux' ? 'Travaux' : 'Libre',
+        signature: c.docusign === 'ok' ? 'Signé' : 'Non signé',
+        surface: c.surface,
+        depot: c.depot,
+        finContrat: c.finContrat,
+        duree: c.duree,
+      });
+    }
+  }
+  return result;
+}
+
+const initialClients = buildInitialClients();
+
+const availableCells = initialClients
+  .filter(c => c.status === 'Libre' || c.status === 'Travaux')
+  .map(c => ({ id: String(c.id), name: c.cell, area: c.surface, price: 0 }));
 
 export default function Clients() {
   const [clients, setClients] = useState(initialClients);
   const uniqueSites = Array.from(new Set(clients.map(c => c.site))).sort();
   const [activeSite, setActiveSite] = useState(uniqueSites[0]);
   const [isCreating, setIsCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     companyName: '',
@@ -107,12 +111,9 @@ export default function Clients() {
         />
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold text-slate-900">Nouveau Contrat</h1>
-          <button 
-            onClick={() => setIsCreating(false)}
-            className="text-slate-500 hover:text-slate-700 font-medium"
-          >
+          <Button variant="ghost" onClick={() => setIsCreating(false)}>
             Annuler
-          </button>
+          </Button>
         </div>
 
         {/* Progress Steps */}
@@ -195,13 +196,13 @@ export default function Clients() {
                 </div>
               </div>
               <div className="flex justify-end pt-4">
-                <button 
+                <Button
                   onClick={handleNext}
                   disabled={!formData.companyName || !formData.representative}
-                  className="bg-brand-blue text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2"
                 >
                   Suivant <ChevronRight size={20} />
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -273,19 +274,16 @@ export default function Clients() {
               </div>
 
               <div className="flex justify-between pt-4">
-                <button 
-                  onClick={handleBack}
-                  className="px-6 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-100"
-                >
+                <Button variant="ghost" onClick={handleBack}>
                   Retour
-                </button>
-                <button 
+                </Button>
+                <Button
                   onClick={handleNext}
                   disabled={!formData.cellId || !formData.startDate}
-                  className="bg-brand-blue text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2"
                 >
                   Suivant <ChevronRight size={20} />
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -294,10 +292,10 @@ export default function Clients() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-slate-900">Aperçu du Contrat</h2>
-                <button className="text-brand-blue font-medium flex items-center gap-2 hover:text-blue-800">
+                <Button variant="ghost" className="text-brand-blue gap-2">
                   <Download size={20} />
                   Télécharger PDF
-                </button>
+                </Button>
               </div>
 
               <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 font-serif text-sm space-y-4 h-96 overflow-y-auto">
@@ -384,13 +382,12 @@ export default function Clients() {
               </div>
 
               <div className="flex justify-between pt-4">
-                <button 
-                  onClick={handleBack}
-                  className="px-6 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-100"
-                >
+                <Button variant="ghost" onClick={handleBack}>
                   Retour
-                </button>
-                <button 
+                </Button>
+                <Button 
+                  variant="success"
+                  className="flex items-center gap-2"
                   onClick={() => {
                     const newClient = {
                       id: Date.now(),
@@ -421,10 +418,9 @@ export default function Clients() {
                       pdfName: ''
                     });
                   }}
-                  className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-emerald-700"
                 >
                   <Check size={20} /> Valider et Créer
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -443,64 +439,77 @@ export default function Clients() {
         className="hidden" 
       />
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Clients & Contrats</h1>
-        <button 
-          onClick={() => setIsCreating(true)}
-          className="bg-brand-blue text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-blue-800 transition-colors"
-        >
-          <Plus size={20} />
+        <h1 className="text-xl font-bold text-slate-900">Clients & Contrats</h1>
+        <Button onClick={() => setIsCreating(true)} className="flex items-center gap-2" size="sm">
+          <Plus size={16} />
           Nouveau Contrat
-        </button>
+        </Button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-4 justify-between items-center">
+      <Card className="overflow-hidden">
+        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-3 justify-between items-center">
           <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text" 
               placeholder="Rechercher un client ou une cellule..." 
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Rechercher un client"
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue bg-white"
             />
           </div>
-          <div className="text-sm text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-            💡 Glissez-déposez vos PDF DocuSign dans le chat pour les lier aux clients
-          </div>
+          <p className="text-xs text-slate-400 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 leading-relaxed">
+            Glissez-déposez vos PDF DocuSign pour les lier aux clients
+          </p>
         </div>
         
         {/* Site Navigation Tabs */}
-        <div className="flex gap-2 border-b border-slate-200 px-4 pt-2">
+        <div className="flex gap-1 border-b border-slate-200 px-4 pt-1 overflow-x-auto" role="tablist" aria-label="Filtrer par site">
           {uniqueSites.map(site => (
             <button
               key={site}
+              role="tab"
+              aria-selected={activeSite === site}
               onClick={() => setActiveSite(site)}
-              className={`px-6 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors ${
+              className={`px-4 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
                 activeSite === site 
                   ? 'border-brand-blue text-brand-blue' 
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-300'
               }`}
             >
-              <MapPin size={16} />
+              <MapPin size={14} />
               {site}
+              <Badge variant={activeSite === site ? 'blue' : 'secondary'} className="text-[10px]">
+                {clients.filter(c => c.site === site).length}
+              </Badge>
             </button>
           ))}
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+          <table className="w-full text-left text-sm" role="table">
+            <thead className="bg-slate-50/80 text-slate-500 font-medium border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4">Client</th>
-                <th className="px-6 py-4">Cellule</th>
-                <th className="px-6 py-4">Loyer Mensuel</th>
-                <th className="px-6 py-4">Statut Contrat</th>
-                <th className="px-6 py-4">Signature (DocuSign)</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-5 py-3.5 text-xs">Client</th>
+                <th className="px-5 py-3.5 text-xs">Cellule</th>
+                <th className="px-5 py-3.5 text-xs hidden sm:table-cell">Surface</th>
+                <th className="px-5 py-3.5 text-xs hidden sm:table-cell">Loyer Mensuel</th>
+                <th className="px-5 py-3.5 text-xs hidden md:table-cell">Dépôt</th>
+                <th className="px-5 py-3.5 text-xs hidden md:table-cell">Statut</th>
+                <th className="px-5 py-3.5 text-xs hidden lg:table-cell">Signature</th>
+                <th className="px-5 py-3.5 text-xs hidden lg:table-cell">Fin Contrat</th>
+                <th className="px-5 py-3.5 text-xs text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {clients
                 .filter(client => client.site === activeSite)
+                .filter(client => {
+                  if (!searchQuery) return true;
+                  const q = searchQuery.toLowerCase();
+                  return client.name.toLowerCase().includes(q) || client.cell.toLowerCase().includes(q) || client.rent.toLowerCase().includes(q);
+                })
                 .sort((a, b) => {
                   const getNum = (str: string) => {
                     const match = str.match(/\d+/);
@@ -509,43 +518,40 @@ export default function Clients() {
                   return getNum(a.cell) - getNum(b.cell);
                 })
                 .map((client: any) => (
-                  <tr key={client.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-slate-900">{client.name}</p>
+                  <tr key={client.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <p className="font-semibold text-slate-900 text-sm">{client.name}</p>
                     </td>
-                    <td className="px-6 py-4 font-medium">{client.cell}</td>
-                    <td className="px-6 py-4 font-medium">{client.rent}</td>
-                    <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                    <td className="px-5 py-3.5 font-medium text-slate-700">{client.cell}</td>
+                    <td className="px-5 py-3.5 font-medium text-slate-700 hidden sm:table-cell">{client.surface > 0 ? `${client.surface} m²` : '—'}</td>
+                    <td className="px-5 py-3.5 font-medium text-slate-700 hidden sm:table-cell">{client.rent}</td>
+                    <td className="px-5 py-3.5 font-medium text-slate-700 hidden md:table-cell">{client.depot > 0 ? `${client.depot.toLocaleString('fr-FR')} €` : '—'}</td>
+                    <td className="px-5 py-3.5 hidden md:table-cell">
+                      <Badge variant={client.status === 'Actif' ? 'success' : client.status === 'Travaux' ? 'secondary' : 'warning'}>
                         {client.status}
-                      </span>
+                      </Badge>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-3.5 hidden lg:table-cell">
                       {client.signature === 'Signé' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                          <Check size={14} /> Signé
-                        </span>
+                        <Badge variant="blue" className="gap-1.5">
+                          <Check size={13} /> Signé
+                        </Badge>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        <Badge variant="warning" className="gap-1.5">
                           {client.signature}
-                        </span>
+                        </Badge>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-5 py-3.5 text-slate-600 text-xs hidden lg:table-cell">{client.finContrat || '—'}</td>
+                    <td className="px-5 py-3.5 text-right">
                       {client.signature === 'Signé' ? (
-                        <button 
-                          onClick={() => handleViewPDF(client)}
-                          className="text-brand-blue hover:text-blue-800 font-medium inline-flex items-center gap-1"
-                        >
-                          <FileText size={16} /> Voir PDF
-                        </button>
+                        <Button variant="ghost" size="sm" onClick={() => handleViewPDF(client)} className="text-brand-blue gap-1 text-xs">
+                          <FileText size={14} /> Voir PDF
+                        </Button>
                       ) : (
-                        <button 
-                          onClick={() => handleLinkPDFClick(client.id)}
-                          className="text-slate-400 hover:text-brand-blue font-medium inline-flex items-center gap-1 transition-colors"
-                        >
-                          <Upload size={16} /> Lier PDF
-                        </button>
+                        <Button variant="ghost" size="sm" onClick={() => handleLinkPDFClick(client.id)} className="text-slate-400 hover:text-brand-blue gap-1 text-xs">
+                          <Upload size={14} /> Lier PDF
+                        </Button>
                       )}
                     </td>
                   </tr>
@@ -553,7 +559,7 @@ export default function Clients() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -70,7 +70,7 @@ export default function Drive() {
           <h1 className="text-2xl font-bold text-slate-900">Coffre-fort Numérique</h1>
           <p className="text-slate-500">Gérez vos contrats, actes notariés et documents administratifs</p>
         </div>
-        <button className="bg-brand-blue text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-blue-800 transition-colors">
+        <button className="bg-brand-blue text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:opacity-85 transition-all">
           <Upload size={20} />
           Importer un document
         </button>

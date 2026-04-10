@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Building2, Calendar, TrendingDown, TrendingUp, AlertCircle, Download, Layers } from 'lucide-react';
+import { Building2, Calendar, TrendingDown, TrendingUp, AlertCircle, Download, Layers, Banknote } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import { useApi } from '../ApiContext';
 
 // Types
 type SiteId = 'consolidated' | 'montigny' | 'boissy' | 'moussy' | 'trappes' | 'nouveauSite';
@@ -137,6 +138,7 @@ export default function ExpensesVsBudget() {
   const [activeSite, setActiveSite] = useState<SiteId>('consolidated');
   const [activeMonth, setActiveMonth] = useState<Month>('01');
   const [year] = useState('2026');
+  const api = useApi();
 
   let currentData: ExpenseLine[] = [];
 
@@ -364,6 +366,55 @@ export default function ExpensesVsBudget() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Live Qonto Debits */}
+      {api.qontoTransactions.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
+                <Banknote size={18} />
+              </div>
+              <div>
+                <h2 className="font-bold text-slate-900">Derniers débits Qonto</h2>
+                <p className="text-xs text-slate-400">Transactions réelles depuis le compte bancaire</p>
+              </div>
+            </div>
+            {api.lastSync && (
+              <span className="text-xs text-slate-400">Synchro : {api.lastSync.toLocaleTimeString('fr-FR')}</span>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Date</th>
+                  <th className="px-5 py-3 font-medium">Libellé</th>
+                  <th className="px-5 py-3 font-medium">Référence</th>
+                  <th className="px-5 py-3 font-medium text-right">Montant</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {api.qontoTransactions
+                  .filter(tx => tx.side === 'debit')
+                  .slice(0, 15)
+                  .map(tx => (
+                    <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-5 py-3 text-slate-600 text-xs">
+                        {tx.settled_at ? new Date(tx.settled_at).toLocaleDateString('fr-FR') : tx.emitted_at ? new Date(tx.emitted_at).toLocaleDateString('fr-FR') : '—'}
+                      </td>
+                      <td className="px-5 py-3 font-medium text-slate-900 max-w-xs truncate">{tx.label || tx.counterparty || '—'}</td>
+                      <td className="px-5 py-3 text-slate-500 text-xs max-w-xs truncate">{tx.reference || '—'}</td>
+                      <td className="px-5 py-3 text-right font-semibold text-rose-600">
+                        −{tx.amount?.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,177 +1,271 @@
 import React, { useState } from 'react';
-import { Download, RefreshCw, CheckCircle2, AlertCircle, Clock, Euro, ArrowUpRight, ArrowDownRight, TrendingUp } from 'lucide-react';
+import { Download, RefreshCw, CheckCircle2, AlertCircle, Clock, Euro, ArrowUpRight, ArrowDownRight, TrendingUp, FileText, ExternalLink } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { realRevenues2026 } from '../data';
+import { useApi } from '../ApiContext';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
 
-const invoices = [
-  { id: 'INV-2026-001', client: 'E-com Express', type: 'Loyer Mensuel', amount: 750, status: 'paid', date: '01/03/2026', sepa: true },
-  { id: 'INV-2026-002', client: 'LogisTech', type: 'Loyer Mensuel', amount: 1400, status: 'pending', date: '05/03/2026', sepa: true },
-  { id: 'INV-2026-003', client: 'Boutique Zen', type: 'Loyer Mensuel', amount: 400, status: 'overdue', date: '28/02/2026', sepa: false },
-  { id: 'INV-2026-004', client: 'MegaStock', type: 'Dépôt de Garantie', amount: 5200, status: 'paid', date: '15/02/2026', sepa: true },
-  { id: 'INV-2026-005', client: 'Nouveau Client', type: 'Dépôt de Garantie', amount: 3400, status: 'pending', date: '10/03/2026', sepa: false },
-];
+// Real BP vs Réel data
+const bpData = realRevenues2026.consolidated.map(d => ({
+  month: d.month,
+  prev: d.bp,
+  reel: d.reel,
+}));
 
-// Mockup data for BP vs Réel
-const bpData = [
-  { month: 'Jan', prev: 85000, reel: 82000 },
-  { month: 'Fév', prev: 85000, reel: 86500 },
-  { month: 'Mar', prev: 88000, reel: 89885 }, // Based on current total: 54385 + 31700 + 3800
-  { month: 'Avr', prev: 90000, reel: null },
-  { month: 'Mai', prev: 90000, reel: null },
-  { month: 'Juin', prev: 92000, reel: null },
-];
+const mapPennylaneStatus = (inv: { paid: boolean; status: string; remaining_amount: number }) => {
+  if (inv.paid) return 'paid';
+  if (inv.status === 'late' || inv.status === 'overdue') return 'overdue';
+  return 'pending';
+};
 
 export default function Billing() {
-  const [isSyncing, setIsSyncing] = useState(false);
+  const api = useApi();
+  const [search, setSearch] = useState('');
 
-  const handleSync = () => {
-    setIsSyncing(true);
-    setTimeout(() => setIsSyncing(false), 1500);
-  };
+  const invoices = api.pennylaneInvoices
+    .filter(inv => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return inv.customer.toLowerCase().includes(q) || inv.invoice_number.includes(q);
+    });
+
+  const paid = invoices.filter(i => i.paid);
+  const pending = invoices.filter(i => !i.paid && mapPennylaneStatus(i) === 'pending');
+  const overdue = invoices.filter(i => mapPennylaneStatus(i) === 'overdue');
+
+  const paidTotal = paid.reduce((s, i) => s + i.amount, 0);
+  const pendingTotal = pending.reduce((s, i) => s + i.amount, 0);
+  const overdueTotal = overdue.reduce((s, i) => s + i.amount, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-page-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Facturation & Trésorerie</h1>
-        <button 
-          onClick={handleSync}
-          disabled={isSyncing}
-          className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={18} className={isSyncing ? 'animate-spin text-brand-blue' : ''} />
-          {isSyncing ? 'Synchronisation...' : 'Synchro Pennylane'}
-        </button>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Facturation & Trésorerie</h1>
+          {api.lastSync && (
+            <p className="text-xs text-slate-400 mt-0.5">
+              Dernière synchro Pennylane : {api.lastSync.toLocaleTimeString('fr-FR')}
+              {' · '}{api.pennylaneInvoices.length} factures chargées
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Rechercher client ou n° facture..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm w-56 focus:outline-none focus:ring-2 focus:ring-brand-blue/30 focus:border-brand-blue"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => api.refresh()}
+            disabled={api.loading}
+            className="gap-2"
+          >
+            <RefreshCw size={15} className={api.loading ? 'animate-spin text-brand-blue' : ''} />
+            {api.loading ? 'Synchronisation...' : 'Synchro Pennylane'}
+          </Button>
+        </div>
       </div>
 
       {/* Cashflow Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-              <ArrowUpRight size={20} />
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-lg bg-success-light flex items-center justify-center text-success">
+                <ArrowUpRight size={18} />
+              </div>
+              <h3 className="font-medium text-slate-500 text-sm">Encaissé</h3>
             </div>
-            <h3 className="font-medium text-slate-600">Encaissé (Mars)</h3>
-          </div>
-          <p className="text-3xl font-bold text-slate-900">5 950 €</p>
-          <p className="text-sm text-slate-500 mt-2">Loyers + Dépôts</p>
-        </div>
+            <p className="text-2xl font-bold text-slate-900">{paidTotal.toLocaleString('fr-FR')} €</p>
+            <p className="text-xs text-slate-400 mt-1">{paid.length} factures encaissées</p>
+          </CardContent>
+        </Card>
         
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-brand-blue">
-              <Clock size={20} />
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-lg bg-brand-blue-light flex items-center justify-center text-brand-blue">
+                <Clock size={18} />
+              </div>
+              <h3 className="font-medium text-slate-500 text-sm">À encaisser</h3>
             </div>
-            <h3 className="font-medium text-slate-600">À encaisser (Mars)</h3>
-          </div>
-          <p className="text-3xl font-bold text-slate-900">4 800 €</p>
-          <p className="text-sm text-slate-500 mt-2">Prélèvements en cours</p>
-        </div>
+            <p className="text-2xl font-bold text-slate-900">{pendingTotal.toLocaleString('fr-FR')} €</p>
+            <p className="text-xs text-slate-400 mt-1">{pending.length} factures en attente</p>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-brand-pink">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center text-brand-pink">
-              <AlertCircle size={20} />
+        <Card className="border-l-4 border-l-brand-pink hover:shadow-md transition-shadow">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-lg bg-brand-pink-light flex items-center justify-center text-brand-pink">
+                <AlertCircle size={18} />
+              </div>
+              <h3 className="font-medium text-slate-500 text-sm">Retards de paiement</h3>
             </div>
-            <h3 className="font-medium text-slate-600">Retards de paiement</h3>
-          </div>
-          <p className="text-3xl font-bold text-slate-900">400 €</p>
-          <p className="text-sm text-brand-pink mt-2 font-medium">1 facture échue</p>
-        </div>
+            <p className="text-2xl font-bold text-slate-900">{overdueTotal.toLocaleString('fr-FR')} €</p>
+            <p className="text-xs text-brand-pink mt-1 font-medium">{overdue.length} facture(s) en retard</p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* BP vs Réel Chart */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Suivi Business Plan : Prévisionnel vs Réel</h2>
-            <p className="text-sm text-slate-500">Comparatif du Chiffre d'Affaires mensuel (en € HT)</p>
-          </div>
-          <div className="flex items-center gap-2 text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg">
-            <TrendingUp size={16} />
-            <span>Mars : +2.1% vs BP</span>
-          </div>
+      {/* Stripe balance info */}
+      {api.stripeBalance && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600">
+                  <Euro size={18} />
+                </div>
+                <h3 className="font-medium text-slate-500 text-sm">Stripe — Disponible</h3>
+              </div>
+              <p className="text-2xl font-bold text-slate-900">{api.stripeBalance.available.toLocaleString('fr-FR')} €</p>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600">
+                  <Clock size={18} />
+                </div>
+                <h3 className="font-medium text-slate-500 text-sm">Stripe — En transit</h3>
+              </div>
+              <p className="text-2xl font-bold text-slate-900">{api.stripeBalance.pending.toLocaleString('fr-FR')} €</p>
+            </CardContent>
+          </Card>
         </div>
-        <div className="h-80">
+      )}
+
+      {/* BP vs Réel Chart */}
+      <Card className="hover:shadow-md transition-shadow">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="text-sm font-semibold">Prévisionnel vs Réel</CardTitle>
+              <CardDescription className="text-xs">CA mensuel (€ HT)</CardDescription>
+            </div>
+            <Badge variant="success" className="gap-1.5 text-xs">
+              <TrendingUp size={14} />
+              Fév : {bpData[1]?.reel && bpData[1]?.prev ? ((((bpData[1].reel - bpData[1].prev) / bpData[1].prev) * 100)).toFixed(1) : '—'}% vs BP
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+        <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={bpData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dx={-10} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dx={-10} />
               <Tooltip 
-                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgb(0 0 0 / 0.08)', fontSize: '13px' }}
                 cursor={{ fill: '#f8fafc' }}
                 formatter={(value: number) => [`${value.toLocaleString()} €`, '']}
               />
-              <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-              <Bar dataKey="prev" name="BP Prévisionnel" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="reel" name="Chiffre d'Affaires Réel" fill="#0000FF" radius={[4, 4, 0, 0]} />
+              <Legend iconType="circle" wrapperStyle={{ paddingTop: '16px', fontSize: '12px', color: '#64748b' }} />
+              <Bar dataKey="prev" name="BP Prévisionnel" fill="#e2e8f0" radius={[6, 6, 0, 0]} maxBarSize={36} />
+              <Bar dataKey="reel" name="CA Réel" fill="var(--color-brand-blue)" radius={[6, 6, 0, 0]} maxBarSize={36} />
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Invoices List */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-          <h2 className="font-semibold text-slate-900">Dernières Factures</h2>
-          <div className="flex gap-2">
-            <span className="flex items-center gap-1 text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">
-              <CheckCircle2 size={14} className="text-emerald-500" /> Mandat SEPA Actif
-            </span>
-            <span className="flex items-center gap-1 text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">
-              <AlertCircle size={14} className="text-amber-500" /> Mandat Manquant
-            </span>
+      {/* Invoices List from Pennylane */}
+      <Card className="hover:shadow-md transition-shadow">
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <CardTitle className="text-sm font-semibold">Factures Pennylane ({invoices.length})</CardTitle>
+            <div className="flex gap-2 text-xs">
+              <Badge variant="success" className="gap-1 text-[10px]">{paid.length} payées</Badge>
+              <Badge variant="blue" className="gap-1 text-[10px]">{pending.length} en attente</Badge>
+              {overdue.length > 0 && <Badge variant="pink" className="gap-1 text-[10px]">{overdue.length} en retard</Badge>}
+            </div>
           </div>
-        </div>
-        
-        <table className="w-full text-left text-sm">
-          <thead className="text-slate-500 font-medium border-b border-slate-200">
+        </CardHeader>
+        <CardContent className="p-0">
+        {api.loading && api.pennylaneInvoices.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <RefreshCw className="w-6 h-6 text-brand-blue animate-spin mr-3" />
+            <span className="text-slate-500">Chargement des factures Pennylane...</span>
+          </div>
+        ) : (
+        <table className="w-full text-left text-sm" role="table">
+          <thead className="text-slate-500 font-medium border-b border-slate-200 bg-slate-50/80">
             <tr>
-              <th className="px-6 py-4">N° Facture</th>
-              <th className="px-6 py-4">Client</th>
-              <th className="px-6 py-4">Type</th>
-              <th className="px-6 py-4">Date</th>
-              <th className="px-6 py-4">Montant HT</th>
-              <th className="px-6 py-4">Statut</th>
-              <th className="px-6 py-4 text-right">Actions</th>
+              <th className="px-5 py-3.5 text-xs">N° Facture</th>
+              <th className="px-5 py-3.5 text-xs">Client</th>
+              <th className="px-5 py-3.5 text-xs hidden md:table-cell">Date</th>
+              <th className="px-5 py-3.5 text-xs hidden lg:table-cell">Échéance</th>
+              <th className="px-5 py-3.5 text-xs text-right">Montant TTC</th>
+              <th className="px-5 py-3.5 text-xs">Statut</th>
+              <th className="px-5 py-3.5 text-xs text-center">Doc</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {invoices.map((invoice) => (
-              <tr key={invoice.id} className="hover:bg-slate-50">
-                <td className="px-6 py-4 font-medium text-slate-900">{invoice.id}</td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-slate-900">{invoice.client}</span>
-                    {invoice.sepa ? (
-                      <CheckCircle2 size={16} className="text-emerald-500" title="Mandat SEPA GoCardless Actif" />
-                    ) : (
-                      <AlertCircle size={16} className="text-amber-500" title="Mandat SEPA Manquant" />
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-slate-500">{invoice.type}</td>
-                <td className="px-6 py-4 text-slate-500">{invoice.date}</td>
-                <td className="px-6 py-4 font-medium">{invoice.amount} €</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                    invoice.status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
-                    invoice.status === 'pending' ? 'bg-blue-100 text-blue-700' :
-                    'bg-pink-100 text-brand-pink'
-                  }`}>
-                    {invoice.status === 'paid' ? 'Payée' :
-                     invoice.status === 'pending' ? 'En attente' : 'En retard'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <button className="text-slate-400 hover:text-brand-blue transition-colors">
-                    <Download size={18} />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {invoices.map((inv) => {
+              const uiStatus = mapPennylaneStatus(inv);
+              return (
+                <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-slate-900 text-xs font-mono">{inv.invoice_number}</td>
+                  <td className="px-5 py-3.5">
+                    <span className="font-medium text-slate-800 text-sm">{inv.customer}</span>
+                  </td>
+                  <td className="px-5 py-3.5 text-slate-400 text-xs hidden md:table-cell">{inv.date}</td>
+                  <td className="px-5 py-3.5 text-slate-400 text-xs hidden lg:table-cell">{inv.deadline}</td>
+                  <td className="px-5 py-3.5 font-semibold text-slate-900 text-right">{inv.amount.toLocaleString('fr-FR')} €</td>
+                  <td className="px-5 py-3.5">
+                    <Badge variant={
+                      uiStatus === 'paid' ? 'success' :
+                      uiStatus === 'pending' ? 'blue' : 'pink'
+                    }>
+                      {uiStatus === 'paid' ? 'Payée' :
+                       uiStatus === 'pending' ? 'En attente' : 'En retard'}
+                    </Badge>
+                  </td>
+                  <td className="px-5 py-3.5 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      {inv.file_url && (
+                        <a href={inv.file_url} target="_blank" rel="noopener noreferrer" title="Télécharger PDF" className="p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-600 transition-colors">
+                          <FileText size={15} />
+                        </a>
+                      )}
+                      {inv.public_url && (
+                        <a href={inv.public_url} target="_blank" rel="noopener noreferrer" title="Voir en ligne" className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors">
+                          <ExternalLink size={15} />
+                        </a>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-      </div>
+        )}
+
+        {/* Pagination */}
+        {api.pennylaneTotalPages > 1 && api.pennylaneInvoices.length > 0 && (
+          <div className="border-t border-slate-200 px-5 py-3 flex items-center justify-between bg-slate-50/50">
+            <span className="text-xs text-slate-400">{api.pennylaneInvoices.length} factures chargées sur ~{api.pennylaneTotalPages * 100}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => api.loadMoreInvoices(Math.floor(api.pennylaneInvoices.length / 100) + 1)}
+              className="text-xs"
+            >
+              Charger plus de factures
+            </Button>
+          </div>
+        )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
